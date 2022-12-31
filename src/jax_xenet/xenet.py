@@ -4,7 +4,7 @@ import jax.numpy as jnp
 import jax.numpy as np
 from jax import grad, jit, vmap
 
-def mpnn(edges, edge_features, node_features, num_propagate_steps):
+def mpnn(edges, edge_features, node_features):
     """
     Message passing neural network (MPNN) implemented in Jax.
     
@@ -35,12 +35,13 @@ def mpnn(edges, edge_features, node_features, num_propagate_steps):
 
     # Define MLP weights and biases for edges
     weights_edge = jax.random.normal( key=key, shape=(num_edge_features, num_node_features) )
-    biases_edge = jax.random.normal( key=key, shape=(num_node_features) )
+    biases_edge = jax.random.normal( key=key, shape=(num_node_features,) )
     # Define MLP weights and biases for nodes
     weights_node = jax.random.normal( key=key, shape=(num_node_features * 2, num_node_features) )
-    biases_node = jax.random.normal( key=key, shape=(num_node_features) )
+    biases_node = jax.random.normal( key=key, shape=(num_node_features,) )
     
     # Propagation step
+    num_propagate_steps = 2
     for _ in range(num_propagate_steps):
         # Initialize messages with zeros
         messages = np.zeros((num_nodes, num_node_features))
@@ -49,14 +50,14 @@ def mpnn(edges, edge_features, node_features, num_propagate_steps):
             src_node, dest_node = edges[edge_idx]
             # Check if there is a reverse edge
             reverse_edge_mask = (edges[:, 0] == dest_node) & (edges[:, 1] == src_node)
-            if np.any(reverse_edge_mask):
-                # Compute message for destination node using MLP
-                message = np.tanh(
+            #if np.any(reverse_edge_mask):
+            # Compute message for destination node using MLP
+            message = np.tanh(
                     np.dot(edge_features[edge_idx], weights_edge) + biases_edge
                 )
-                message = np.dot(message, node_features[src_node])
-                # Accumulate message for destination node
-                messages[dest_node] += message
+            message = np.dot(message, node_features[src_node])
+            # Accumulate message for destination node
+            messages[dest_node] += message
         # Aggregate messages and node features
         node_features_updated = np.concatenate(
             [node_features_updated, messages], axis=-1
@@ -69,7 +70,7 @@ def mpnn(edges, edge_features, node_features, num_propagate_steps):
     return node_features_updated
 
 # Compile the function with JIT for faster evaluation
-mpnn_jit = jit(mpnn)
+mpnn_jit = jit(mpnn)#, static_argnames=['num_propagate_steps'])
 
 def test():
     # Test the function with some
@@ -77,11 +78,12 @@ def test():
     num_nodes = 4
     num_node_features = 3
     num_edge_features = 5
+    #num_propagate_steps = 2
 
     key = jax.random.PRNGKey(0)
     edge_features = jax.random.uniform( key, shape=(edges.shape[0], num_edge_features) )
     node_features = jax.random.uniform( key, shape=(num_nodes, num_node_features) )
     num_propagate_steps = 2
-    output = mpnn_jit(edges, edge_features, node_features, num_propagate_steps)
+    output = mpnn_jit(edges, edge_features, node_features)
     print( output )
 test()
