@@ -1,3 +1,6 @@
+import numpy as onp
+import jax
+import jax.numpy as jnp
 import jax.numpy as np
 from jax import grad, jit, vmap
 
@@ -24,15 +27,18 @@ def mpnn(edges, edge_features, node_features, num_propagate_steps):
         Updated node features of shape (num_nodes, num_node_features).
     """
 
+    key = jax.random.PRNGKey(0)
     num_nodes = node_features.shape[0]
+    num_edge_features = edge_features.shape[-1]
+    num_node_features = node_features.shape[-1]
     node_features_updated = node_features
-    
+
     # Define MLP weights and biases for edges
-    weights_edge = np.random.randn(num_edge_features, num_node_features)
-    biases_edge = np.random.randn(num_node_features)
+    weights_edge = jax.random.normal( key=key, shape=(num_edge_features, num_node_features) )
+    biases_edge = jax.random.normal( key=key, shape=(num_node_features) )
     # Define MLP weights and biases for nodes
-    weights_node = np.random.randn(num_node_features * 2, num_node_features)
-    biases_node = np.random.randn(num_node_features)
+    weights_node = jax.random.normal( key=key, shape=(num_node_features * 2, num_node_features) )
+    biases_node = jax.random.normal( key=key, shape=(num_node_features) )
     
     # Propagation step
     for _ in range(num_propagate_steps):
@@ -65,9 +71,17 @@ def mpnn(edges, edge_features, node_features, num_propagate_steps):
 # Compile the function with JIT for faster evaluation
 mpnn_jit = jit(mpnn)
 
-# Test the function with some
-edges = jnp.array([[0, 1], [1, 2], [2, 3], [3, 0]])
-edge_features = jnp.random.rand(edges.shape[0], num_edge_features)
-node_features = jnp.random.rand(num_nodes, num_node_features)
-num_propagate_steps = 2
-output = mpnn_jit(edges, edge_features, node_features, num_propagate_steps)
+def test():
+    # Test the function with some
+    edges = jnp.array([[0, 1], [1, 2], [2, 3], [3, 0]])
+    num_nodes = 4
+    num_node_features = 3
+    num_edge_features = 5
+
+    key = jax.random.PRNGKey(0)
+    edge_features = jax.random.uniform( key, shape=(edges.shape[0], num_edge_features) )
+    node_features = jax.random.uniform( key, shape=(num_nodes, num_node_features) )
+    num_propagate_steps = 2
+    output = mpnn_jit(edges, edge_features, node_features, num_propagate_steps)
+    print( output )
+test()
