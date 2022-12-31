@@ -18,8 +18,6 @@ def mpnn(edges, edge_features, node_features):
         Edge features of shape (num_edges, num_edge_features).
     node_features : np.ndarray
         Node features of shape (num_nodes, num_node_features).
-    num_propagate_steps : int
-        Number of propagation steps.
     
     Returns
     -------
@@ -34,9 +32,10 @@ def mpnn(edges, edge_features, node_features):
     num_node_features = node_features.shape[-1]
     num_edges = edge_features.shape[0]
     num_edge_features = edge_features.shape[-1]
-    node_features_updated = node_features
 
+    # TODO - decouple into its own setting
     Fout = num_node_features
+    Sout = num_edge_features
 
     # Define MLP weights and biases for edges
     message_input_size = 2*num_node_features + 2*num_edge_features
@@ -46,19 +45,25 @@ def mpnn(edges, edge_features, node_features):
         else:      return stack_sizes[ i-1 ]
     n_stack_convs = len(stack_sizes)
     
-    weights_edge = [ jax.random.normal( key=key, shape=( stack_input_size(i), stack_sizes[i]) ) for i in range(len(stack_sizes)) ] 
-    biases_edge = [ jax.random.normal( key=key, shape=( stack_sizes[i], ) ) for i in range(len(stack_sizes)) ] 
+    # Define MLP weights and biases for stacks
+    weights_stack = [ jax.random.normal( key=key, shape=( stack_input_size(i), stack_sizes[i]) ) for i in range(len(stack_sizes)) ] 
+    biases_stack = [ jax.random.normal( key=key, shape=( stack_sizes[i], ) ) for i in range(len(stack_sizes)) ] 
 
     # Define MLP weights and biases for nodes
     weights_node = jax.random.normal( key=key, shape=(num_node_features + (stack_sizes[-1]*2), Fout) )
     biases_node = jax.random.normal( key=key, shape=(Fout,) )
+
+    # Define MLP weights and biases for edges
+    weights_edge = jax.random.normal( key=key, shape=(stack_sizes[-1], Sout) )
+    biases_edge = jax.random.normal( key=key, shape=(Sout,) )
     
     reverse_edge_error_flag = np.ones((1,))
 
     # Initialize messages with zeros
-    #messages = np.zeros((num_nodes, Fout))
     incoming_stacks = np.zeros((num_nodes, stack_sizes[-1]))
     outgoing_stacks = np.zeros((num_nodes, stack_sizes[-1]))
+    all_stacks = np.zeros((num_edges, stack_sizes[-1]))
+    
 
     # Iterate over edges
     for edge_idx in range(edges.shape[0]):
@@ -85,7 +90,7 @@ def mpnn(edges, edge_features, node_features):
 
         # Compute message for destination node using MLP
         for i in range( n_stack_convs ):
-            stack = np.dot(stack, weights_edge[i]) + biases_edge[i]
+            stack = np.dot(stack, weights_stack[i]) + biases_stack[i]
             stack = nn.relu( stack )
 
         # TODO attention
@@ -93,6 +98,11 @@ def mpnn(edges, edge_features, node_features):
         # Accumulate messages for nodes
         incoming_stacks.at[dest_node].set( incoming_stacks[dest_node] + stack )
         outgoing_stacks.at[src_node].set( outgoing_stacks[src_node] + stack )
+        all_stacks.at[edge_idx].set( stack )
+
+    #########
+    # NODES #
+    #########
 
     # Aggregate messages and node features
     node_features_updated = np.concatenate(
@@ -103,14 +113,28 @@ def mpnn(edges, edge_features, node_features):
     node_features_updated = nn.relu(
         np.dot(node_features_updated, weights_node) + biases_node
     )
+
+    #########
+    # EDGES #
+    #########
+
+    # Apply MLP to update edge features
+    edge_features_updated = nn.relu(
+        np.dot(all_stacks, weights_edge) + biases_edge
+    )
+    edge_features_updated = all_stacks # TODO rm
+
+    ##########
+    # ERRORS #
+    ##########
     
     # flip all flags such that 0 means "pass"
     reverse_edge_error_flag = 1 - reverse_edge_error_flag
 
     if debug_mode:
-        return node_features_updated, reverse_edge_error_flag
+        return node_features_updated, edge_features_updated, reverse_edge_error_flag
     else:
-        return node_features_updated, None
+        return node_features_updated, edge_features_updated, None
 
 # Compile the function with JIT for faster evaluation
 mpnn_jit = jit(mpnn)#, static_argnames=['num_propagate_steps'])
