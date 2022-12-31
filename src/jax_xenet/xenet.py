@@ -33,15 +33,17 @@ def mpnn(edges, edge_features, node_features):
     num_edges = edge_features.shape[0]
     num_edge_features = edge_features.shape[-1]
 
+    Fin = num_node_features
+    Sin = num_edge_features
+
     # TODO - decouple into its own setting
     Fout = num_node_features
     Sout = num_edge_features
 
     # Define MLP weights and biases for edges
-    message_input_size = 2*num_node_features + 2*num_edge_features
     stack_sizes = [ 64, 64 ]
     def stack_input_size( i ):
-        if i == 0: return message_input_size
+        if i == 0: return 2*Fin + 2*Sin
         else:      return stack_sizes[ i-1 ]
     n_stack_convs = len(stack_sizes)
     
