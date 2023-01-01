@@ -89,19 +89,19 @@ class XENet(nn.Module):
         #########
 
         # Aggregate messages and node features
-        node_features_updated = np.concatenate(
+        x_out = np.concatenate(
             [x_in, incoming_stacks, outgoing_stacks],
             axis=-1
         )
         # Apply MLP to update node features
-        node_features_updated = nn.relu(nn.Dense(self.Fout)(node_features_updated))
+        x_out = nn.relu(nn.Dense(self.Fout, name="Dense_x_out" )(x_out))
 
         #########
         # EDGES #
         #########
 
         # Apply MLP to update edge features
-        edge_features_updated = nn.relu(nn.Dense(self.Sout)(all_stacks))
+        e_out = nn.relu(nn.Dense(self.Sout, name="Dense_e_out")(all_stacks))
 
         ##########
         # ERRORS #
@@ -111,9 +111,9 @@ class XENet(nn.Module):
         reverse_edge_error_flag = 1 - reverse_edge_error_flag
 
         if self.debug_mode:
-            return node_features_updated, edge_features_updated, reverse_edge_error_flag
+            return x_out, e_out, reverse_edge_error_flag
         else:
-            return node_features_updated, edge_features_updated, None
+            return x_out, e_out, None
 
     
 
@@ -132,6 +132,8 @@ def test():
 
     
     variables = model.init(jax.random.PRNGKey(0), node_features, edges, edge_features )
+    print( variables )
+
     output = model.apply(variables, node_features, edges, edge_features )
 
     print( output )
