@@ -98,9 +98,9 @@ def mpnn(edges, edge_features, node_features):
         # TODO attention
 
         # Accumulate messages for nodes
-        incoming_stacks.at[dest_node].set( incoming_stacks[dest_node] + stack )
-        outgoing_stacks.at[src_node].set( outgoing_stacks[src_node] + stack )
-        all_stacks.at[edge_idx].set( stack )
+        incoming_stacks = incoming_stacks.at[dest_node].add( stack )
+        outgoing_stacks = outgoing_stacks.at[src_node].add( stack )
+        all_stacks = all_stacks.at[edge_idx].set( stack )
 
     #########
     # NODES #
@@ -139,7 +139,8 @@ def mpnn(edges, edge_features, node_features):
         return node_features_updated, edge_features_updated, None
 
 # Compile the function with JIT for faster evaluation
-mpnn_jit = jit(mpnn)#, static_argnames=['num_propagate_steps'])
+#mpnn_jit = jit(mpnn)#, static_argnames=['num_propagate_steps'])
+mpnn_jit = mpnn
 
 def test():
     #edges = jnp.array([[0, 1], [1, 2], [2, 3], [3, 0]])
