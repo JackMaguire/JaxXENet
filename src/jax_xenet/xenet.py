@@ -37,8 +37,8 @@ def mpnn(edges, edge_features, node_features):
     Sin = num_edge_features
 
     # TODO - decouple into its own setting
-    Fout = num_node_features
-    Sout = num_edge_features
+    Fout = 3
+    Sout = 4
 
     # Define MLP weights and biases for edges
     stack_sizes = [ 64, 64 ]
@@ -124,7 +124,6 @@ def mpnn(edges, edge_features, node_features):
     edge_features_updated = nn.relu(
         np.dot(all_stacks, weights_edge) + biases_edge
     )
-    edge_features_updated = all_stacks # TODO rm
 
     ##########
     # ERRORS #
@@ -139,8 +138,8 @@ def mpnn(edges, edge_features, node_features):
         return node_features_updated, edge_features_updated, None
 
 # Compile the function with JIT for faster evaluation
-#mpnn_jit = jit(mpnn)#, static_argnames=['num_propagate_steps'])
-mpnn_jit = mpnn
+mpnn_jit = jit(mpnn)
+#mpnn_jit = mpnn
 
 def test():
     #edges = jnp.array([[0, 1], [1, 2], [2, 3], [3, 0]])
@@ -155,4 +154,6 @@ def test():
     num_propagate_steps = 2
     output = mpnn_jit(edges, edge_features, node_features)
     print( output )
+    for x in output:
+        print( x.shape )
 test()
