@@ -146,28 +146,28 @@ class XENet(nn.Module):
             return x_out, e_out, None
 
     
+if __name__ == '__main__':
+    model = XENet( [64,64], 3, 4, True ) 
 
-model = XENet( [64,64], 3, 4, True ) 
+    def test():
+        #edges = jnp.array([[0, 1], [1, 2], [2, 3], [3, 0]])
+        edges = jnp.array([[0, 1], [1, 2], [2, 3], [3, 0], [1, 0], [2, 1], [3, 2], [0, 3] ])
+        num_nodes = 4
+        num_node_features = 3
+        num_edge_features = 5
 
-def test():
-    #edges = jnp.array([[0, 1], [1, 2], [2, 3], [3, 0]])
-    edges = jnp.array([[0, 1], [1, 2], [2, 3], [3, 0], [1, 0], [2, 1], [3, 2], [0, 3] ])
-    num_nodes = 4
-    num_node_features = 3
-    num_edge_features = 5
+        key = jax.random.PRNGKey(0)
+        edge_features = jax.random.uniform( key, shape=(edges.shape[0], num_edge_features) )
+        node_features = jax.random.uniform( key, shape=(num_nodes, num_node_features) )
 
-    key = jax.random.PRNGKey(0)
-    edge_features = jax.random.uniform( key, shape=(edges.shape[0], num_edge_features) )
-    node_features = jax.random.uniform( key, shape=(num_nodes, num_node_features) )
+        variables = model.init(jax.random.PRNGKey(0), node_features, edges, edge_features )
+        print( "VAR", len(variables['params']) )
+        print( variables )
 
-    variables = model.init(jax.random.PRNGKey(0), node_features, edges, edge_features )
-    print( "VAR", len(variables['params']) )
-    print( variables )
+        output = model.apply(variables, node_features, edges, edge_features )
 
-    output = model.apply(variables, node_features, edges, edge_features )
-
-    #print( output )
-    for x in output:
-        print( x.shape )
-        #print( x )
-test()
+        #print( output )
+        for x in output:
+            print( x.shape )
+            #print( x )
+    test()
