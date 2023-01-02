@@ -14,7 +14,7 @@ class KerasStylePReLU(nn.Module):
         negative_slope_init = 0.0 #keras style
         feat = x.shape[-1]
         negative_slope = self.param(
-            "negative_slope",
+            "kernel",
             lambda k: jnp.zeros( shape=(feat,), dtype=x.dtype)
         )
         #print( x.shape, negative_slope.shape )
