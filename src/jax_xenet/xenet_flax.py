@@ -7,6 +7,21 @@ from jax import grad, jit, vmap, nn
 import flax.linen as nn
 from typing import Sequence
 
+class KerasStylePReLU(nn.Module):
+    #negative_slope_init: float = 0.01
+    @nn.compact
+    def __call__(self, x: jnp.ndarray) -> jnp.ndarray:
+        negative_slope_init = 0.0 #keras style
+        feat = x.shape[-1]
+        negative_slope = self.param(
+            "negative_slope",
+            lambda k: jnp.zeros( shape=(feat,), dtype=x.dtype)
+        )
+        #print( x.shape, negative_slope.shape )
+        return (negative_slope*x*(x<=0)) + (x*(x>0))
+        
+    #return jnp.where(x >= 0, x, negative_slope * x)
+
 class XENet(nn.Module):
     stack_sizes: Sequence[int]
     Fout: int
@@ -76,8 +91,14 @@ class XENet(nn.Module):
             all_stacks = all_stacks.at[edge_idx].set( stack )
 
         # Compute message for destination node using MLP
-        for feat in self.stack_sizes:
-            all_stacks = nn.relu(nn.Dense(feat)(all_stacks))
+        for i, feat in enumerate( self.stack_sizes ):
+            all_stacks = nn.Dense(feat)(all_stacks)
+            if i < len(self.stack_sizes)-1:
+                all_stacks = nn.relu( all_stacks )
+            else:
+                #all_stacks = nn.PReLU()( all_stacks )
+                all_stacks = KerasStylePReLU()( all_stacks )
+                #print( "!!!", all_stacks.get_variable() )
 
         # TODO attention
         incoming_att_sigmoid = nn.sigmoid(nn.Dense(1)(stack))
@@ -123,11 +144,11 @@ class XENet(nn.Module):
 
     
 
-model = XENet( [64,64], 2, 3, True ) 
+model = XENet( [64,64], 3, 4, True ) 
 
 def test():
-    edges = jnp.array([[0, 1], [1, 2], [2, 3], [3, 0]])
-    #edges = jnp.array([[0, 1], [1, 2], [2, 3], [3, 0], [1, 0], [2, 1], [3, 2], [0, 3] ])
+    #edges = jnp.array([[0, 1], [1, 2], [2, 3], [3, 0]])
+    edges = jnp.array([[0, 1], [1, 2], [2, 3], [3, 0], [1, 0], [2, 1], [3, 2], [0, 3] ])
     num_nodes = 4
     num_node_features = 3
     num_edge_features = 5
@@ -136,14 +157,14 @@ def test():
     edge_features = jax.random.uniform( key, shape=(edges.shape[0], num_edge_features) )
     node_features = jax.random.uniform( key, shape=(num_nodes, num_node_features) )
 
-    
     variables = model.init(jax.random.PRNGKey(0), node_features, edges, edge_features )
     print( "VAR", len(variables['params']) )
-    #print( variables )
+    print( variables )
 
     output = model.apply(variables, node_features, edges, edge_features )
 
     #print( output )
-    #for x in output:
-    #    print( x.shape )
+    for x in output:
+        print( x.shape )
+        print( x )
 test()
