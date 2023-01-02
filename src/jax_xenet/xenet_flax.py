@@ -48,7 +48,7 @@ class XENet(nn.Module):
         ss = self.stack_sizes[-1]
         incoming_stacks = np.zeros((num_nodes, ss))
         outgoing_stacks = np.zeros((num_nodes, ss))
-        all_stacks      = np.zeros((num_edges, ss))
+        all_stacks      = np.zeros((num_edges, 2*Fin + 2*Sin))
 
         # Iterate over edges
         for edge_idx in range(a_in.shape[0]):
@@ -73,16 +73,22 @@ class XENet(nn.Module):
                 axis=-1
             )
 
-            # Compute message for destination node using MLP
-            for feat in self.stack_sizes:
-                stack = nn.relu(nn.Dense(feat)(stack))
+            all_stacks = all_stacks.at[edge_idx].set( stack )
 
-            # TODO attention
+        # Compute message for destination node using MLP
+        for feat in self.stack_sizes:
+            all_stacks = nn.relu(nn.Dense(feat)(all_stacks))
+
+        # TODO attention
+        incoming_att_sigmoid = nn.sigmoid(nn.Dense(1)(stack))
+        outgoing_att_sigmoid = nn.sigmoid(nn.Dense(1)(stack))
+
+        for edge_idx in range(a_in.shape[0]):
+            src_node, dest_node = a_in[edge_idx]
 
             # Accumulate messages for nodes
-            incoming_stacks = incoming_stacks.at[dest_node].add( stack )
-            outgoing_stacks = outgoing_stacks.at[src_node].add( stack )
-            all_stacks = all_stacks.at[edge_idx].set( stack )
+            incoming_stacks = incoming_stacks.at[dest_node].add( all_stacks[edge_idx] )
+            outgoing_stacks = outgoing_stacks.at[src_node].add( all_stacks[edge_idx] )
 
         #########
         # NODES #
@@ -120,8 +126,8 @@ class XENet(nn.Module):
 model = XENet( [64,64], 2, 3, True ) 
 
 def test():
-    #edges = jnp.array([[0, 1], [1, 2], [2, 3], [3, 0]])
-    edges = jnp.array([[0, 1], [1, 2], [2, 3], [3, 0], [1, 0], [2, 1], [3, 2], [0, 3] ])
+    edges = jnp.array([[0, 1], [1, 2], [2, 3], [3, 0]])
+    #edges = jnp.array([[0, 1], [1, 2], [2, 3], [3, 0], [1, 0], [2, 1], [3, 2], [0, 3] ])
     num_nodes = 4
     num_node_features = 3
     num_edge_features = 5
@@ -132,11 +138,12 @@ def test():
 
     
     variables = model.init(jax.random.PRNGKey(0), node_features, edges, edge_features )
-    print( variables )
+    print( "VAR", len(variables['params']) )
+    #print( variables )
 
     output = model.apply(variables, node_features, edges, edge_features )
 
-    print( output )
-    for x in output:
-        print( x.shape )
+    #print( output )
+    #for x in output:
+    #    print( x.shape )
 test()
