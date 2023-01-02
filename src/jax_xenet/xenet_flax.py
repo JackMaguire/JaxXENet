@@ -61,9 +61,9 @@ class XENet(nn.Module):
 
         # Initialize messages with zeros
         ss = self.stack_sizes[-1]
-        incoming_stacks = np.zeros((num_nodes, ss))
-        outgoing_stacks = np.zeros((num_nodes, ss))
-        all_stacks      = np.zeros((num_edges, 2*Fin + 2*Sin))
+        incoming_msgs = np.zeros((num_nodes, ss))
+        outgoing_msgs = np.zeros((num_nodes, ss))
+        all_stacks    = np.zeros((num_edges, 2*Fin + 2*Sin))
 
         # Iterate over edges
         for edge_idx in range(a_in.shape[0]):
@@ -92,7 +92,7 @@ class XENet(nn.Module):
 
         # Compute message for destination node using MLP
         for i, feat in enumerate( self.stack_sizes ):
-            all_stacks = nn.Dense(feat)(all_stacks)
+            all_stacks = nn.Dense(feat, name="Dense_XENet_stack{}".format(i))(all_stacks)
             if i < len(self.stack_sizes)-1:
                 all_stacks = nn.relu( all_stacks )
             else:
@@ -101,15 +101,18 @@ class XENet(nn.Module):
                 #print( "!!!", all_stacks.get_variable() )
 
         # TODO attention
-        incoming_att_sigmoid = nn.sigmoid(nn.Dense(1)(stack))
-        outgoing_att_sigmoid = nn.sigmoid(nn.Dense(1)(stack))
+        incoming_att_sigmoid = nn.sigmoid(nn.Dense(1, name="Dense_incoming_att")(all_stacks))
+        outgoing_att_sigmoid = nn.sigmoid(nn.Dense(1, name="Dense_outgoing_att")(all_stacks))
+
+        incoming_stacks = all_stacks * incoming_att_sigmoid
+        outgoing_stacks = all_stacks * outgoing_att_sigmoid
 
         for edge_idx in range(a_in.shape[0]):
             src_node, dest_node = a_in[edge_idx]
 
             # Accumulate messages for nodes
-            incoming_stacks = incoming_stacks.at[dest_node].add( all_stacks[edge_idx] )
-            outgoing_stacks = outgoing_stacks.at[src_node].add( all_stacks[edge_idx] )
+            incoming_msgs = incoming_msgs.at[dest_node].add( incoming_stacks[edge_idx] )
+            outgoing_msgs = outgoing_msgs.at[src_node].add( outgoing_stacks[edge_idx] )
 
         #########
         # NODES #
@@ -117,7 +120,7 @@ class XENet(nn.Module):
 
         # Aggregate messages and node features
         x_out = np.concatenate(
-            [x_in, incoming_stacks, outgoing_stacks],
+            [x_in, incoming_msgs, outgoing_msgs],
             axis=-1
         )
         # Apply MLP to update node features
@@ -166,5 +169,5 @@ def test():
     #print( output )
     for x in output:
         print( x.shape )
-        print( x )
+        #print( x )
 test()
