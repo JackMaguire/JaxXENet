@@ -8,7 +8,6 @@ import flax.linen as nn
 from typing import Sequence
 
 class KerasStylePReLU(nn.Module):
-    #negative_slope_init: float = 0.01
     @nn.compact
     def __call__(self, x: jnp.ndarray) -> jnp.ndarray:
         negative_slope_init = 0.0 #keras style
@@ -17,10 +16,8 @@ class KerasStylePReLU(nn.Module):
             "kernel",
             lambda k: jnp.zeros( shape=(feat,), dtype=x.dtype)
         )
-        #print( x.shape, negative_slope.shape )
         return (negative_slope*x*(x<=0)) + (x*(x>0))
         
-    #return jnp.where(x >= 0, x, negative_slope * x)
 
 class XENet(nn.Module):
     stack_sizes: Sequence[int]
