@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 from torch import nn
-#from typing import Sequence
+from typing import Sequence
 #import torch.nn as nn
 
 '''class KerasStylePReLU(nn.Module):
@@ -25,9 +25,12 @@ class XENet(nn.Module):
     Sout: int
     debug_mode: bool = True
 
-
-    def __init__(self):
+    def __init__(self, ss, f, s, d):
         super().__init__()
+        self.stack_sizes = ss
+        self.Fout = f
+        self.Sout = s
+        self.debug_mode = d
 
     def forward(self, x_in, a_in, e_in):
         """
@@ -69,7 +72,7 @@ class XENet(nn.Module):
             src_node, dest_node = a_in[edge_idx]
 
             # Check if there is a reverse edge
-            reverse_edge_mask = (a_in[:, 0] == dest_node) & (a_in[:, 1] == src_node)
+            reverse_edge_mask = (a_in[:, 0] == dest_node) & (a_in[:, 1] == src_node).int()
             rev_edge_idx = torch.argmax(reverse_edge_mask)
 
             if self.debug_mode:
@@ -80,6 +83,8 @@ class XENet(nn.Module):
             x_i = x_in[ src_node ]
             x_j = x_in[ dest_node ]
             e_ij = e_in[ edge_idx ]
+            print( edge_idx )
+            print( rev_edge_idx.shape )
             e_ji = e_in[ rev_edge_idx ]
 
             stack = torch.concat(
@@ -157,16 +162,20 @@ if __name__ == '__main__':
         num_node_features = 3
         num_edge_features = 5
 
-        edge_features = np.random.uniform( shape=(edges.shape[0], num_edge_features) )
-        node_features = np.random.uniform( shape=(num_nodes, num_node_features) )
+        edge_features = np.random.uniform( (edges.shape[0], num_edge_features) )
+        node_features = np.random.uniform( (num_nodes, num_node_features) )
+
+        node_features = torch.from_numpy(node_features)
+        edges = torch.from_numpy(edges)
+        edge_features = torch.from_numpy(edge_features)
 
         #print( "VAR", len(variables['params']) )
         #print( variables )
 
-        output = model.apply(variables, node_features, edges, edge_features )
+        output = model(node_features, edges, edge_features )
 
         #print( output )
         for x in output:
             print( x.shape )
             #print( x )
-    #test()
+    test()
